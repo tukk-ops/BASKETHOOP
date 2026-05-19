@@ -1,0 +1,21 @@
+[
+    {
+        "id": 2,
+        "name": "Test",
+        "number": "10",
+        "team": "A",
+        "fgm": 9,
+        "fga": 13,
+        "tpm": 9,
+        "tpa": 13,
+        "ftm": 0,
+        "fta": 0,
+        "orb": 11,
+        "drb": 0,
+        "ast": 0,
+        "stl": 0,
+        "blk": 0,
+        "tov": 5,
+        "pf": 0
+    }
+]

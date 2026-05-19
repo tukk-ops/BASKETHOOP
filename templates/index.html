@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>籃球數據統計系統</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .stat-btn { width: 40px; }
+        .player-card { border-bottom: 1px solid #ddd; padding: 10px 0; }
+        .team-header { background: #f8f9fa; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body class="container py-4">
+    {% raw %}
+    <div id="app">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>籃球數據統計</h1>
+            <a href="/export" class="btn btn-success">匯出 CSV 報表</a>
+        </div>
+
+        <!-- 新增球員 -->
+        <div class="row g-2 mb-4 p-3 border rounded">
+            <div class="col-md-3"><input v-model="newP.name" class="form-control" placeholder="球員姓名"></div>
+            <div class="col-md-2"><input v-model="newP.number" class="form-control" placeholder="號碼"></div>
+            <div class="col-md-2">
+                <select v-model="newP.team" class="form-select">
+                    <option value="A">A 隊</option>
+                    <option value="B">B 隊</option>
+                </select>
+            </div>
+            <div class="col-md-2"><button @click="addPlayer" class="btn btn-primary w-100">新增球員</button></div>
+        </div>
+
+        <div class="row">
+            <!-- A/B 隊 列表 -->
+            <div v-for="t in ['A', 'B']" class="col-md-6">
+                <h3 class="team-header d-flex justify-content-between">
+                    <span>{{ t }} 隊</span>
+                    <span class="text-danger">總得分: {{ players.filter(p => p.team === t).reduce((sum, p) => sum + Math.max(0, p.fgm - p.tpm) * 2 + p.tpm * 3 + p.ftm, 0) }}</span>
+                </h3>
+                <div v-for="p in players.filter(i => i.team === t)" :key="p.id" class="player-card">
+                    <div class="fw-bold d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="fs-5">#{{ p.number }} {{ p.name }}</span>
+                            <span class="text-primary ms-2">(個人總得分: {{ Math.max(0, p.fgm - p.tpm) * 2 + p.tpm * 3 + p.ftm }})</span>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger" @click="deletePlayer(p.id)" title="刪除球員">
+                            🗑️ 刪除
+                        </button>
+                    </div>
+                    
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        <stat-tool name="2分進" field="twopm" :p="p" :display-value="Math.max(0, p.fgm - p.tpm)" @change="updateStat"></stat-tool>
+                        <stat-tool name="2分投" field="twopa" :p="p" :display-value="Math.max(0, p.fga - p.tpa)" @change="updateStat"></stat-tool>
+                        <stat-tool name="三分" field="tpm" :p="p" @change="updateStat"></stat-tool>
+                        <stat-tool name="三投" field="tpa" :p="p" @change="updateStat"></stat-tool>
+                        <stat-tool name="罰進" field="ftm" :p="p" @change="updateStat"></stat-tool>
+                        <stat-tool name="罰投" field="fta" :p="p" @change="updateStat"></stat-tool>
+                        <stat-tool name="進籃" field="orb" :p="p" @change="updateStat"></stat-tool>
+                        <stat-tool name="防籃" field="drb" :p="p" @change="updateStat"></stat-tool>
+                        <stat-tool name="助攻" field="ast" :p="p" @change="updateStat"></stat-tool>
+                        <stat-tool name="抄截" field="stl" :p="p" @change="updateStat"></stat-tool>
+                        <stat-tool name="阻攻" field="blk" :p="p" @change="updateStat"></stat-tool>
+                        <stat-tool name="失誤" field="tov" :p="p" @change="updateStat"></stat-tool>
+                        <stat-tool name="犯規" field="pf" :p="p" @change="updateStat"></stat-tool>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        const StatTool = {
+            props: ['name', 'field', 'p', 'displayValue'],
+            template: `
+                <div class="border p-1 text-center" style="min-width: 80px;">
+                    <small>{{ name }}</small><br>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1" @click="$emit('change', p.id, field, -1)">-</button>
+                    <span class="mx-1 fw-bold">{{ displayValue !== undefined ? displayValue : p[field] }}</span>
+                    <button class="btn btn-sm btn-outline-primary py-0 px-1" @click="$emit('change', p.id, field, 1)">+</button>
+                </div>
+            `
+        };
+
+        createApp({
+            components: { 'stat-tool': StatTool },
+            data() {
+                return {
+                    players: [],
+                    newP: { name: '', number: '', team: 'A' }
+                }
+            },
+            methods: {
+                async fetchPlayers() {
+                    const res = await fetch('/api/players');
+                    this.players = await res.json();
+                },
+                async addPlayer() {
+                    if (!this.newP.name || !this.newP.number) return alert('請填寫姓名號碼');
+                    const res = await fetch('/api/players', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.newP)
+                    });
+                    if (res.ok) {
+                        this.fetchPlayers();
+                        this.newP.name = ''; this.newP.number = '';
+                    } else {
+                        const err = await res.json();
+                        alert(err.error);
+                    }
+                },
+                async updateStat(id, field, delta) {
+                    await fetch('/api/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id, field, delta })
+                    });
+                    this.fetchPlayers();
+                },
+                async deletePlayer(id) {
+                    if (!confirm('確定要刪除這位球員嗎？相關數據也會從隊伍總得分中移除。')) return;
+                    await fetch('/api/players/' + id, {
+                        method: 'DELETE'
+                    });
+                    this.fetchPlayers();
+                }
+            },
+            mounted() { this.fetchPlayers(); }
+        }).mount('#app');
+    </script>
+    {% endraw %}
+</body>
+</html>
